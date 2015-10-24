@@ -20,24 +20,12 @@ let releaseBinDir = binDir @@ "Release/"
 
 // Don't normalize. Raspberry Pi is linux, so directory separator is '/'.
 // And cannot use '~' in Windows, so needs absolute path.
-let deployPath = @"pi@192.168.0.7:/home/pi/dev/autonek-hamtor/"
+let deployPath = @"pi@192.168.0.7:/home/pi/bin/Hamtor/"
 
 let packDir = hamtorProjectDir @@ "pack/"
 let releasePackDir = normalizePath (packDir @@ "Release/")
 
-Target "Pack" (fun _ ->
-    if not (TestDir releasePackDir) then
-        CreateDir releasePackDir
-
-    !! (releaseBinDir @@ "*.exe")
-    ++ (releaseBinDir @@ "*.dll")
-    -- (releaseBinDir @@ "FSharp.Core.dll")
-    |> Copy (normalizePath releasePackDir)
-)
-
-Target "Deploy" (fun _ ->
-    let source = releasePackDir
-    let target = deployPath
+let deploy source target =
     let args = sprintf "-r %s %s" source target
     let result = 
         ExecProcess (fun info -> 
@@ -46,6 +34,24 @@ Target "Deploy" (fun _ ->
             info.Arguments <- args) System.TimeSpan.MaxValue
     if result <> 0 then
         failwithf "failed to execute scp. Source: %s Target: %s" source target
+
+Target "Pack" (fun _ ->
+    if not (TestDir releasePackDir) then
+        CreateDir releasePackDir
+
+    // delete unnecessary files and directories.
+    CleanDir releasePackDir
+
+    !! (releaseBinDir @@ "*.exe")
+    ++ (releaseBinDir @@ "*.dll")
+    ++ (rootDir @@ "Hamtor.sh")
+    ++ (rootDir @@ "Install.sh")
+    -- (releaseBinDir @@ "FSharp.Core.dll")
+    |> Copy (normalizePath releasePackDir)
+)
+
+Target "Deploy" (fun _ ->
+    deploy releasePackDir deployPath
 )
 
 "Pack" ==> "Deploy"
